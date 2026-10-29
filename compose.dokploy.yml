@@ -8,7 +8,7 @@ services:
       - dokploy-network
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=postgres;Database=mantenimientos_db;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy}"
+      ConnectionStrings__DefaultConnection: "${ConnectionStrings__DefaultConnection:?Set ConnectionStrings__DefaultConnection in Dokploy}"
       Jwt__Secret: "${JWT_SECRET:?Set JWT_SECRET in Dokploy}"
       Jwt__Issuer: MSApiMantenimientosEvolutivos
       Jwt__Audience: BancoEcuador
