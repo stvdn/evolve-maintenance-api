@@ -1,0 +1,1254 @@
+openapi: 3.0.3
+info:
+  title: MSApiMantenimientosEvolutivos
+  description: |
+    API RESTful para la gestión de mantenimientos evolutivos y métricas de calidad de código
+    en Banco Ecuador. Centraliza el ciclo de vida de proyectos menores a 300 horas,
+    automatizando la captura de métricas y estandarizando el proceso de revisión técnica.
+
+    ## Autenticación
+    La API utiliza **JWT (JSON Web Tokens)** para autenticación.
+    Incluir el token en el header `Authorization: Bearer <token>` en cada petición protegida.
+
+    ## Roles y Permisos (RBAC)
+    | Rol | Permisos |
+    |-----|----------|
+    | `developer` | Consultar mantenimientos asignados, registrar métricas propias |
+    | `architect` | Gestión completa de mantenimientos, revisión de métricas, aprobaciones |
+    | `manager` | Lectura de estadísticas, reportes consolidados |
+
+    ## Rate Limiting
+    | Rol | Límite |
+    |-----|--------|
+    | `developer` | 60 req/min |
+    | `architect` | 100 req/min |
+    | `manager` | 30 req/min |
+
+    ## Paginación
+    Los endpoints de listado soportan paginación con los query params `page` y `limit`.
+
+    ## Códigos de Error
+    | Código | Significado |
+    |--------|-------------|
+    | 400 | Bad Request - Datos de entrada inválidos |
+    | 401 | Unauthorized - Token JWT ausente o inválido |
+    | 403 | Forbidden - Rol sin permisos para el recurso |
+    | 404 | Not Found - Recurso no encontrado |
+    | 429 | Too Many Requests - Rate limit excedido |
+    | 500 | Internal Server Error |
+  version: 1.0.0
+  contact:
+    name: Célula de Mantenimientos Evolutivos
+    email: arquitectura@bancoecuador.com
+  license:
+    name: Uso Interno - Banco Ecuador
+    url: https://bancoecuador.com/licencias
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Servidor de desarrollo local
+  - url: https://api.bancoecuador.com/api/v1
+    description: Servidor de producción
+
+tags:
+  - name: Auth
+    description: Autenticación y gestión de sesiones
+  - name: Maintenances
+    description: Gestión de mantenimientos evolutivos
+  - name: Metrics
+    description: Métricas de calidad de código
+  - name: Users
+    description: Gestión de perfil de usuario
+
+# ==================== PATHS ====================
+paths:
+
+  # ---------- AUTH ----------
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Registrar nuevo usuario
+      description: |
+        Crea una nueva cuenta de usuario en el sistema.
+        Solo los arquitectos pueden registrar usuarios con rol `architect` o `manager`.
+      operationId: registerUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              fullName: "Carlos López"
+              email: "carlos.lopez@bancoecuador.com"
+              password: "SecureP@ss123"
+              role: "developer"
+      responses:
+        '201':
+          description: Usuario registrado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: El email ya está registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "El email carlos.lopez@bancoecuador.com ya está registrado"
+                statusCode: 409
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Iniciar sesión
+      description: Autentica un usuario y retorna un token JWT válido por 8 horas.
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: "carlos.lopez@bancoecuador.com"
+              password: "SecureP@ss123"
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                status: "success"
+                data:
+                  user:
+                    id: "550e8400-e29b-41d4-a716-446655440000"
+                    fullName: "Carlos López"
+                    email: "carlos.lopez@bancoecuador.com"
+                    role: "developer"
+                  token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  expiresIn: "8h"
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Email o contraseña incorrectos"
+                statusCode: 401
+
+  # ---------- MAINTENANCES ----------
+  /maintenances:
+    get:
+      tags: [Maintenances]
+      summary: Listar mantenimientos
+      description: |
+        Retorna una lista paginada de mantenimientos evolutivos.
+        - `developer`: solo ve mantenimientos donde está asignado.
+        - `architect` y `manager`: ven todos los mantenimientos.
+      operationId: listMaintenances
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+        - name: status
+          in: query
+          description: Filtrar por estado del mantenimiento
+          schema:
+            $ref: '#/components/schemas/MaintenanceStatus'
+        - name: applicationName
+          in: query
+          description: Filtrar por nombre de aplicación
+          schema:
+            type: string
+            example: "core-banking-loans"
+        - name: squad
+          in: query
+          description: Filtrar por squad asignado
+          schema:
+            type: string
+            example: "Squad Alpha"
+        - name: sortBy
+          in: query
+          description: Campo para ordenar resultados
+          schema:
+            type: string
+            enum: [createdAt, estimatedHours, status, applicationName]
+            default: createdAt
+        - name: order
+          in: query
+          description: Dirección del ordenamiento
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Lista de mantenimientos obtenida exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+
+    post:
+      tags: [Maintenances]
+      summary: Crear mantenimiento
+      description: |
+        Crea un nuevo mantenimiento evolutivo.
+        Solo usuarios con rol `architect` pueden crear mantenimientos.
+      operationId: createMaintenance
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMaintenanceRequest'
+            example:
+              name: "Actualización flujo aprobación de créditos"
+              description: "Modificar el flujo de aprobación para incluir validación biométrica en préstamos mayores a $10,000"
+              applicationName: "core-banking-loans"
+              estimatedHours: 240
+              squad: "Squad Alpha"
+              assignedArchitect: "juan.perez@bancoecuador.com"
+      responses:
+        '201':
+          description: Mantenimiento creado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /maintenances/stats:
+    get:
+      tags: [Maintenances]
+      summary: Obtener estadísticas de mantenimientos
+      description: |
+        Retorna estadísticas consolidadas de los mantenimientos evolutivos.
+        Disponible para roles `architect` y `manager`.
+      operationId: getMaintenanceStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Estadísticas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceStatsResponse'
+              example:
+                status: "success"
+                data:
+                  totalMaintenances: 48
+                  byStatus:
+                    draft: 1
+                    in_progress: 2
+                    in_review: 1
+                    completed: 40
+                    cancelled: 4
+                  averageHours: 185
+                  averageCompletionDays: 22
+                  thisMonth:
+                    created: 4
+                    completed: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /maintenances/{id}:
+    get:
+      tags: [Maintenances]
+      summary: Obtener detalle de mantenimiento
+      description: Retorna los datos completos de un mantenimiento específico por su ID.
+      operationId: getMaintenanceById
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MaintenanceIdParam'
+      responses:
+        '200':
+          description: Detalle del mantenimiento
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    patch:
+      tags: [Maintenances]
+      summary: Actualizar mantenimiento
+      description: |
+        Actualiza parcialmente un mantenimiento existente.
+        Solo `architect` puede cambiar cualquier campo.
+        Un `developer` solo puede cambiar el estado a `in_review`.
+      operationId: updateMaintenance
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MaintenanceIdParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMaintenanceRequest'
+            example:
+              status: "in_review"
+              description: "Flujo actualizado con validación biométrica integrada"
+      responses:
+        '200':
+          description: Mantenimiento actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MaintenanceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Maintenances]
+      summary: Eliminar mantenimiento
+      description: |
+        Elimina un mantenimiento del sistema.
+        Solo `architect` puede eliminar. No se permite eliminar mantenimientos en estado `completed`.
+      operationId: deleteMaintenance
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/MaintenanceIdParam'
+      responses:
+        '200':
+          description: Mantenimiento eliminado exitosamente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "success"
+                  message:
+                    type: string
+                    example: "Mantenimiento eliminado exitosamente"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ---------- METRICS ----------
+  /metrics:
+    post:
+      tags: [Metrics]
+      summary: Registrar métricas de calidad
+      description: |
+        Registra un nuevo conjunto de métricas de calidad de código asociadas a un mantenimiento.
+        Cualquier rol puede registrar métricas, pero el mantenimiento debe existir.
+      operationId: createMetric
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMetricRequest'
+            example:
+              maintenanceId: "550e8400-e29b-41d4-a716-446655440000"
+              coveragePercentage: 85.5
+              cyclomaticComplexity: 12
+              codeSmells: 3
+              vulnerabilities: 0
+              duplicatedLinesPercentage: 2.1
+              linesOfCode: 1250
+              technicalDebtMinutes: 45
+      responses:
+        '201':
+          description: Métricas registradas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Mantenimiento no encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: "error"
+                message: "Mantenimiento con ID 550e8400-... no encontrado"
+                statusCode: 404
+
+  /metrics/maintenances/{maintenanceId}:
+    get:
+      tags: [Metrics]
+      summary: Obtener métricas de un mantenimiento
+      description: |
+        Retorna la métrica más reciente registrada para un mantenimiento específico.
+      operationId: getMetricsByMaintenance
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: maintenanceId
+          in: path
+          required: true
+          description: ID del mantenimiento
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Métricas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /metrics/maintenances/{maintenanceId}/history:
+    get:
+      tags: [Metrics]
+      summary: Historial de métricas de un mantenimiento
+      description: |
+        Retorna el historial completo de métricas registradas para un mantenimiento,
+        ordenadas de la más reciente a la más antigua.
+        Permite ver la evolución de la calidad del código a lo largo del tiempo.
+      operationId: getMetricsHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: maintenanceId
+          in: path
+          required: true
+          description: ID del mantenimiento
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: Historial de métricas obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /metrics/alerts:
+    get:
+      tags: [Metrics]
+      summary: Obtener alertas de métricas
+      description: |
+        Retorna mantenimientos cuyas métricas más recientes están por debajo de los umbrales
+        de calidad definidos. Los umbrales por defecto son:
+        - Cobertura < 80%
+        - Vulnerabilidades > 0
+        - Complejidad ciclomática > 20
+        - Duplicación > 5%
+
+        Disponible para roles `architect` y `manager`.
+      operationId: getMetricAlerts
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: minCoverage
+          in: query
+          description: Umbral mínimo de cobertura (%)
+          schema:
+            type: number
+            format: float
+            default: 80
+        - name: maxVulnerabilities
+          in: query
+          description: Umbral máximo de vulnerabilidades permitidas
+          schema:
+            type: integer
+            default: 0
+        - name: maxComplexity
+          in: query
+          description: Umbral máximo de complejidad ciclomática
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: Alertas obtenidas exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AlertListResponse'
+              example:
+                status: "success"
+                data:
+                  - maintenanceId: "550e8400-e29b-41d4-a716-446655440000"
+                    maintenanceName: "Actualización módulo préstamos"
+                    alerts:
+                      - type: "LOW_COVERAGE"
+                        message: "Cobertura de código (65%) por debajo del umbral (80%)"
+                        severity: "high"
+                        currentValue: 65
+                        threshold: 80
+                      - type: "HIGH_VULNERABILITY"
+                        message: "Se detectaron 2 vulnerabilidades (umbral: 0)"
+                        severity: "critical"
+                        currentValue: 2
+                        threshold: 0
+                    measuredAt: "2026-10-14T16:00:00Z"
+                totalAlerts: 3
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ---------- USERS ----------
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Obtener perfil del usuario actual
+      description: Retorna los datos del usuario autenticado basándose en el token JWT.
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Perfil obtenido exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    patch:
+      tags: [Users]
+      summary: Actualizar perfil del usuario actual
+      description: Permite al usuario actualizar su nombre o contraseña.
+      operationId: updateCurrentUser
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+            example:
+              fullName: "Carlos A. López"
+      responses:
+        '200':
+          description: Perfil actualizado exitosamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ==================== COMPONENTS ====================
+components:
+
+  # ---------- SECURITY SCHEMES ----------
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Token JWT obtenido del endpoint /auth/login
+
+  # ---------- PARAMETERS ----------
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      description: Número de página (comienza en 1)
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      description: Cantidad de elementos por página
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+
+    MaintenanceIdParam:
+      name: id
+      in: path
+      required: true
+      description: ID único del mantenimiento (UUID)
+      schema:
+        type: string
+        format: uuid
+        example: "550e8400-e29b-41d4-a716-446655440000"
+
+  # ---------- RESPONSES ----------
+  responses:
+    BadRequest:
+      description: Datos de entrada inválidos
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationErrorResponse'
+          example:
+            status: "error"
+            message: "Error de validación"
+            statusCode: 400
+            errors:
+              - field: "estimatedHours"
+                message: "Debe ser un número entre 1 y 300"
+              - field: "email"
+                message: "Formato de email inválido"
+
+    Unauthorized:
+      description: Token JWT ausente, expirado o inválido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: "error"
+            message: "Token de acceso inválido o expirado"
+            statusCode: 401
+
+    Forbidden:
+      description: El rol del usuario no tiene permisos para este recurso
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: "error"
+            message: "No tiene permisos para acceder a este recurso"
+            statusCode: 403
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: "error"
+            message: "Recurso no encontrado"
+            statusCode: 404
+
+    TooManyRequests:
+      description: Límite de peticiones excedido
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: "error"
+            message: "Demasiadas peticiones. Intente de nuevo en 60 segundos"
+            statusCode: 429
+      headers:
+        Retry-After:
+          description: Segundos hasta poder hacer la siguiente petición
+          schema:
+            type: integer
+            example: 60
+        X-RateLimit-Limit:
+          description: Límite total de peticiones por minuto
+          schema:
+            type: integer
+            example: 100
+        X-RateLimit-Remaining:
+          description: Peticiones restantes en la ventana actual
+          schema:
+            type: integer
+            example: 0
+
+  # ---------- SCHEMAS ----------
+  schemas:
+
+    # --- Auth Schemas ---
+    RegisterRequest:
+      type: object
+      required: [fullName, email, password, role]
+      properties:
+        fullName:
+          type: string
+          minLength: 3
+          maxLength: 100
+          description: Nombre completo del usuario
+          example: "Carlos López"
+        email:
+          type: string
+          format: email
+          description: Correo electrónico corporativo
+          example: "carlos.lopez@bancoecuador.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+          description: "Contraseña (mínimo 8 caracteres, debe incluir mayúscula, minúscula, número y carácter especial)"
+          example: "SecureP@ss123"
+        role:
+          $ref: '#/components/schemas/UserRole'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: "carlos.lopez@bancoecuador.com"
+        password:
+          type: string
+          format: password
+          example: "SecureP@ss123"
+
+    AuthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/User'
+            token:
+              type: string
+              description: Token JWT firmado
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            expiresIn:
+              type: string
+              description: Tiempo de expiración del token
+              example: "8h"
+
+    # --- Maintenance Schemas ---
+    MaintenanceStatus:
+      type: string
+      enum: [draft, in_progress, in_review, completed, cancelled]
+      description: |
+        Estados posibles de un mantenimiento:
+        - `draft`: Recién creado, en planificación
+        - `in_progress`: En desarrollo activo
+        - `in_review`: Código entregado, pendiente de revisión
+        - `completed`: Revisado y aprobado
+        - `cancelled`: Cancelado
+
+    Maintenance:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único del mantenimiento
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: Nombre descriptivo del mantenimiento
+          example: "Actualización flujo aprobación de créditos"
+        description:
+          type: string
+          description: Descripción detallada del alcance
+          example: "Modificar el flujo de aprobación para incluir validación biométrica"
+        applicationName:
+          type: string
+          description: Nombre de la aplicación bancaria afectada
+          example: "core-banking-loans"
+        estimatedHours:
+          type: integer
+          minimum: 1
+          maximum: 300
+          description: Horas estimadas de esfuerzo (máximo 300)
+          example: 240
+        status:
+          $ref: '#/components/schemas/MaintenanceStatus'
+        squad:
+          type: string
+          description: Squad de desarrollo asignado
+          example: "Squad Alpha"
+        assignedArchitect:
+          type: string
+          format: email
+          description: Email del arquitecto revisor asignado
+          example: "juan.perez@bancoecuador.com"
+        createdAt:
+          type: string
+          format: date-time
+          description: Fecha y hora de creación
+          example: "2026-10-01T10:00:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          description: Fecha y hora de última actualización
+          example: "2026-10-10T15:30:00Z"
+
+    CreateMaintenanceRequest:
+      type: object
+      required: [name, applicationName, estimatedHours, squad, assignedArchitect]
+      properties:
+        name:
+          type: string
+          minLength: 5
+          maxLength: 200
+          example: "Actualización flujo aprobación de créditos"
+        description:
+          type: string
+          maxLength: 2000
+          example: "Modificar el flujo de aprobación para incluir validación biométrica"
+        applicationName:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "core-banking-loans"
+        estimatedHours:
+          type: integer
+          minimum: 1
+          maximum: 300
+          example: 240
+        squad:
+          type: string
+          minLength: 2
+          maxLength: 100
+          example: "Squad Alpha"
+        assignedArchitect:
+          type: string
+          format: email
+          example: "juan.perez@bancoecuador.com"
+
+    UpdateMaintenanceRequest:
+      type: object
+      description: Todos los campos son opcionales. Solo se actualizan los campos enviados.
+      properties:
+        name:
+          type: string
+          minLength: 5
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        applicationName:
+          type: string
+          minLength: 2
+          maxLength: 100
+        estimatedHours:
+          type: integer
+          minimum: 1
+          maximum: 300
+        status:
+          $ref: '#/components/schemas/MaintenanceStatus'
+        squad:
+          type: string
+          minLength: 2
+          maxLength: 100
+        assignedArchitect:
+          type: string
+          format: email
+
+    MaintenanceResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/Maintenance'
+
+    MaintenanceListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Maintenance'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    MaintenanceStatsResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: object
+          properties:
+            totalMaintenances:
+              type: integer
+              description: Total de mantenimientos registrados
+              example: 48
+            byStatus:
+              type: object
+              properties:
+                draft:
+                  type: integer
+                  example: 1
+                in_progress:
+                  type: integer
+                  example: 2
+                in_review:
+                  type: integer
+                  example: 1
+                completed:
+                  type: integer
+                  example: 40
+                cancelled:
+                  type: integer
+                  example: 4
+            averageHours:
+              type: number
+              format: float
+              description: Promedio de horas estimadas por mantenimiento
+              example: 185
+            averageCompletionDays:
+              type: number
+              format: float
+              description: Promedio de días para completar un mantenimiento
+              example: 22
+            thisMonth:
+              type: object
+              properties:
+                created:
+                  type: integer
+                  description: Mantenimientos creados este mes
+                  example: 4
+                completed:
+                  type: integer
+                  description: Mantenimientos completados este mes
+                  example: 3
+
+    # --- Metric Schemas ---
+    CodeMetric:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Identificador único de la medición
+          example: "7c9e6679-7425-40de-944b-e07fc1f90ae7"
+        maintenanceId:
+          type: string
+          format: uuid
+          description: ID del mantenimiento asociado
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        coveragePercentage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Porcentaje de cobertura de código
+          example: 85.5
+        cyclomaticComplexity:
+          type: integer
+          minimum: 0
+          description: Complejidad ciclomática promedio
+          example: 12
+        codeSmells:
+          type: integer
+          minimum: 0
+          description: Cantidad de code smells detectados
+          example: 3
+        vulnerabilities:
+          type: integer
+          minimum: 0
+          description: Cantidad de vulnerabilidades de seguridad detectadas
+          example: 0
+        duplicatedLinesPercentage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: Porcentaje de líneas duplicadas
+          example: 2.1
+        linesOfCode:
+          type: integer
+          minimum: 0
+          description: Total de líneas de código del proyecto
+          example: 1250
+        technicalDebtMinutes:
+          type: integer
+          minimum: 0
+          description: Deuda técnica estimada en minutos
+          example: 45
+        measuredAt:
+          type: string
+          format: date-time
+          description: Fecha y hora de la medición
+          example: "2026-10-14T16:00:00Z"
+
+    CreateMetricRequest:
+      type: object
+      required: [maintenanceId, coveragePercentage, cyclomaticComplexity, codeSmells, vulnerabilities, duplicatedLinesPercentage]
+      properties:
+        maintenanceId:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        coveragePercentage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          example: 85.5
+        cyclomaticComplexity:
+          type: integer
+          minimum: 0
+          example: 12
+        codeSmells:
+          type: integer
+          minimum: 0
+          example: 3
+        vulnerabilities:
+          type: integer
+          minimum: 0
+          example: 0
+        duplicatedLinesPercentage:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          example: 2.1
+        linesOfCode:
+          type: integer
+          minimum: 0
+          example: 1250
+        technicalDebtMinutes:
+          type: integer
+          minimum: 0
+          example: 45
+
+    MetricResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/CodeMetric'
+
+    MetricListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CodeMetric'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+
+    Alert:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [LOW_COVERAGE, HIGH_VULNERABILITY, HIGH_COMPLEXITY, HIGH_DUPLICATION]
+          description: Tipo de alerta
+        message:
+          type: string
+          description: Descripción legible de la alerta
+        severity:
+          type: string
+          enum: [low, medium, high, critical]
+          description: Severidad de la alerta
+        currentValue:
+          type: number
+          description: Valor actual de la métrica
+        threshold:
+          type: number
+          description: Umbral configurado
+
+    AlertListResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          type: array
+          items:
+            type: object
+            properties:
+              maintenanceId:
+                type: string
+                format: uuid
+              maintenanceName:
+                type: string
+              alerts:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Alert'
+              measuredAt:
+                type: string
+                format: date-time
+        totalAlerts:
+          type: integer
+          description: Número total de alertas activas
+
+    # --- User Schemas ---
+    UserRole:
+      type: string
+      enum: [developer, architect, manager]
+      description: |
+        Roles del sistema:
+        - `developer`: Desarrollador de la célula
+        - `architect`: Arquitecto revisor
+        - `manager`: Gerente de TI
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        fullName:
+          type: string
+          example: "Carlos López"
+        email:
+          type: string
+          format: email
+          example: "carlos.lopez@bancoecuador.com"
+        role:
+          $ref: '#/components/schemas/UserRole'
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-01T08:00:00Z"
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        fullName:
+          type: string
+          minLength: 3
+          maxLength: 100
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+
+    UserResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "success"
+        data:
+          $ref: '#/components/schemas/User'
+
+    # --- Shared Schemas ---
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          description: Página actual
+          example: 1
+        limit:
+          type: integer
+          description: Elementos por página
+          example: 10
+        total:
+          type: integer
+          description: Total de elementos
+          example: 48
+        totalPages:
+          type: integer
+          description: Total de páginas
+          example: 5
+
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "error"
+        message:
+          type: string
+          description: Mensaje descriptivo del error
+        statusCode:
+          type: integer
+          description: Código HTTP del error
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "error"
+        message:
+          type: string
+          example: "Error de validación"
+        statusCode:
+          type: integer
+          example: 400
+        errors:
+          type: array
+          description: Lista de errores de validación por campo
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Campo con error
+                example: "estimatedHours"
+              message:
+                type: string
+                description: Descripción del error
+                example: "Debe ser un número entre 1 y 300"

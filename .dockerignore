@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+**/node_modules/
+**/.git/
+**/.vs/
+**/tests/
+*.md
+*.drawio
+*.svg
+*.zip
+*.yaml

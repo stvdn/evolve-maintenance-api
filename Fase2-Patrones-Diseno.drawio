@@ -1,0 +1,203 @@
+<mxfile host="app.diagrams.net" modified="2026-10-12T00:00:00.000Z" agent="draw.io" type="device">
+  <diagram id="api-gateway-flow" name="Patrón API Gateway - Flujo">
+    <mxGraphModel dx="1422" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- TÍTULO -->
+        <mxCell id="t1" value="&lt;b&gt;Patrón API Gateway - Flujo de Procesamiento de Peticiones&lt;/b&gt;&lt;br&gt;MSApiMantenimientosEvolutivos - Banco Ecuador" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="230" y="15" width="500" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- FLUJO DEL API GATEWAY (vertical, centro de la página) -->
+        <mxCell id="gw1" value="&lt;b&gt;Petición HTTP entrante&lt;/b&gt;&lt;br&gt;GET /api/v1/maintenances" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="80" width="250" height="45" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw2" value="&lt;b&gt;1. Rate Limiter&lt;/b&gt;&lt;br&gt;Verifica límite de peticiones por minuto según rol&lt;br&gt;developer: 60 | architect: 100 | manager: 30" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="160" width="300" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw3" value="&lt;b&gt;2. CORS Handler&lt;/b&gt;&lt;br&gt;Valida origen de la petición&lt;br&gt;Solo permite dominios autorizados de Banco Ecuador" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="250" width="300" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw4" value="&lt;b&gt;3. Request Logger&lt;/b&gt;&lt;br&gt;Registra: método, ruta, IP, timestamp, user-agent&lt;br&gt;Formato JSON → Winston → archivo/consola" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="340" width="300" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw5" value="&lt;b&gt;4. JWT Validator&lt;/b&gt;&lt;br&gt;Extrae token del header Authorization: Bearer &amp;lt;token&amp;gt;&lt;br&gt;Valida firma, expiración y extrae payload (userId, rol)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="430" width="300" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw6" value="&lt;b&gt;5. RBAC Middleware&lt;/b&gt;&lt;br&gt;Verifica que el rol del usuario tiene permiso&lt;br&gt;para acceder al recurso solicitado" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="325" y="520" width="300" height="55" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="gw7" value="&lt;b&gt;6. Router&lt;/b&gt;&lt;br&gt;Dirige al controlador correspondiente" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="350" y="610" width="250" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- CONTROLADORES (abajo, horizontal) -->
+        <mxCell id="ctrl1" value="&lt;b&gt;Maintenances&lt;br&gt;Controller&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="700" width="140" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ctrl2" value="&lt;b&gt;Metrics&lt;br&gt;Controller&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="405" y="700" width="140" height="45" as="geometry"/>
+        </mxCell>
+        <mxCell id="ctrl3" value="&lt;b&gt;Auth&lt;br&gt;Controller&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="610" y="700" width="140" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ERRORES (lado derecho) -->
+        <mxCell id="err1" value="&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;429&lt;/b&gt; Too Many Requests&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="165" width="170" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="err2" value="&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;403&lt;/b&gt; Forbidden (CORS)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="255" width="170" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="err3" value="&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;401&lt;/b&gt; Unauthorized&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="435" width="170" height="30" as="geometry"/>
+        </mxCell>
+        <mxCell id="err4" value="&lt;font color=&quot;#b85450&quot;&gt;&lt;b&gt;403&lt;/b&gt; Forbidden (RBAC)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="720" y="525" width="170" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- FLECHAS DEL FLUJO PRINCIPAL -->
+        <mxCell id="fa1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw1" target="gw2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw2" target="gw3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw3" target="gw4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw4" target="gw5" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa5" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw5" target="gw6" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa6" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#666666;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw6" target="gw7" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- FLECHAS ROUTER → CONTROLADORES -->
+        <mxCell id="fa7" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.25;exitY=1;" edge="1" source="gw7" target="ctrl1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa8" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.5;exitY=1;" edge="1" source="gw7" target="ctrl2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fa9" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=1.5;entryX=0.5;entryY=0;exitX=0.75;exitY=1;" edge="1" source="gw7" target="ctrl3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- FLECHAS DE ERROR (desde cada middleware hacia la derecha) -->
+        <mxCell id="fe1" style="html=1;strokeColor=#b85450;strokeWidth=1;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="gw2" target="err1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe2" style="html=1;strokeColor=#b85450;strokeWidth=1;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="gw3" target="err2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe3" style="html=1;strokeColor=#b85450;strokeWidth=1;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="gw5" target="err3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="fe4" style="html=1;strokeColor=#b85450;strokeWidth=1;dashed=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" source="gw6" target="err4" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ETIQUETA: Flujo exitoso vs Flujo de error -->
+        <mxCell id="lbl1" value="✅ Flujo exitoso" style="text;html=1;fontSize=9;fontStyle=1;fontColor=#82b366;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="200" y="80" width="100" height="20" as="geometry"/>
+        </mxCell>
+        <mxCell id="lbl2" value="❌ Flujo de error" style="text;html=1;fontSize=9;fontStyle=1;fontColor=#b85450;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="720" y="140" width="100" height="20" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+
+  <diagram id="circuit-breaker-states" name="Patrón Circuit Breaker - Estados">
+    <mxGraphModel dx="1422" dy="820" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="827" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- TÍTULO -->
+        <mxCell id="t2" value="&lt;b&gt;Patrón Circuit Breaker - Diagrama de Estados&lt;/b&gt;&lt;br&gt;MSApiMantenimientosEvolutivos - Banco Ecuador" style="text;html=1;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="280" y="15" width="450" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- ESTADO: CERRADO (CLOSED) -->
+        <mxCell id="s1" value="&lt;b&gt;CERRADO&lt;br&gt;(CLOSED)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Estado normal.&lt;br&gt;Todas las peticiones&lt;br&gt;pasan al servicio externo.&lt;br&gt;Se cuentan los fallos." style="ellipse;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="140" y="150" width="220" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- ESTADO: ABIERTO (OPEN) -->
+        <mxCell id="s2" value="&lt;b&gt;ABIERTO&lt;br&gt;(OPEN)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Circuito abierto.&lt;br&gt;Todas las peticiones se&lt;br&gt;rechazan inmediatamente.&lt;br&gt;Retorna respuesta por defecto." style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="150" width="220" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- ESTADO: SEMI-ABIERTO (HALF-OPEN) -->
+        <mxCell id="s3" value="&lt;b&gt;SEMI-ABIERTO&lt;br&gt;(HALF-OPEN)&lt;/b&gt;&lt;br&gt;&lt;br&gt;Permite UNA petición de&lt;br&gt;prueba al servicio externo.&lt;br&gt;Evalúa si se recuperó." style="ellipse;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="390" y="470" width="220" height="180" as="geometry"/>
+        </mxCell>
+
+        <!-- TRANSICIÓN: CERRADO → ABIERTO -->
+        <mxCell id="tr1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;strokeWidth=2;exitX=1;exitY=0.5;entryX=0;entryY=0.5;curved=1;" edge="1" source="s1" target="s2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="tr1label" value="&lt;b&gt;5 fallos consecutivos&lt;/b&gt;&lt;br&gt;(failureThreshold = 5)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#b85450;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="tr1">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint y="-20" as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- TRANSICIÓN: ABIERTO → SEMI-ABIERTO -->
+        <mxCell id="tr2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#d6b656;strokeWidth=2;exitX=0.5;exitY=1;entryX=1;entryY=0.5;curved=1;" edge="1" source="s2" target="s3" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="tr2label" value="&lt;b&gt;Timeout expira&lt;/b&gt;&lt;br&gt;(resetTimeout = 30s)" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#d6b656;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="tr2">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint x="20" as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- TRANSICIÓN: SEMI-ABIERTO → CERRADO (éxito) -->
+        <mxCell id="tr3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#82b366;strokeWidth=2;exitX=0;exitY=0.5;entryX=0.5;entryY=1;curved=1;" edge="1" source="s3" target="s1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="tr3label" value="&lt;b&gt;Petición de prueba EXITOSA&lt;/b&gt;&lt;br&gt;Servicio se recuperó ✅" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#82b366;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="tr3">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint x="-25" as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- TRANSICIÓN: SEMI-ABIERTO → ABIERTO (fallo) -->
+        <mxCell id="tr4" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#b85450;strokeWidth=2;exitX=1;exitY=0.5;entryX=0.5;entryY=1;curved=1;" edge="1" source="s3" target="s2" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="tr4label" value="&lt;b&gt;Petición de prueba FALLA&lt;/b&gt;&lt;br&gt;Servicio sigue caído ❌" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontColor=#b85450;labelBackgroundColor=#FFFFFF;" connectable="0" vertex="1" parent="tr4">
+          <mxGeometry x="-0.1" relative="1" as="geometry"><mxPoint x="25" as="offset"/></mxGeometry>
+        </mxCell>
+
+        <!-- CUADRO DE CONFIGURACIÓN -->
+        <mxCell id="cfg" value="&lt;b&gt;Configuración del Circuit Breaker&lt;/b&gt;&lt;br&gt;&lt;br&gt;&lt;b&gt;failureThreshold:&lt;/b&gt; 5 fallos consecutivos&lt;br&gt;&lt;b&gt;resetTimeout:&lt;/b&gt; 30 segundos&lt;br&gt;&lt;b&gt;requestTimeout:&lt;/b&gt; 10 segundos&lt;br&gt;&lt;b&gt;fallback:&lt;/b&gt; { status: &amp;quot;service_unavailable&amp;quot;, fallback: true }" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="700" width="350" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- EJEMPLO DE USO -->
+        <mxCell id="uso" value="&lt;b&gt;Aplicación en MSApiMantenimientosEvolutivos&lt;/b&gt;&lt;br&gt;&lt;br&gt;El Circuit Breaker envuelve las llamadas del&lt;br&gt;&lt;b&gt;MetricsService&lt;/b&gt; hacia servicios externos&lt;br&gt;(SonarQube, GitHub/GitLab).&lt;br&gt;&lt;br&gt;Si SonarQube está caído, la API sigue operando&lt;br&gt;normalmente para mantenimientos y métricas locales." style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;spacingLeft=10;verticalAlign=top;spacingTop=8;shadow=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="700" width="380" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- INDICADOR VISUAL DE FLUJO -->
+        <mxCell id="flow1" value="INICIO" style="shape=mxgraph.flowchart.start_2;html=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="90" width="100" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="flow1arr" style="html=1;strokeColor=#82b366;strokeWidth=1.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" source="flow1" target="s1" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

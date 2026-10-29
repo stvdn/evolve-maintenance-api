@@ -1,0 +1,41 @@
+services:
+  api:
+    build: .
+    expose:
+      - "8080"
+    networks:
+      - default
+      - dokploy-network
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=postgres;Database=mantenimientos_db;Username=postgres;Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy}"
+      Jwt__Secret: "${JWT_SECRET:?Set JWT_SECRET in Dokploy}"
+      Jwt__Issuer: MSApiMantenimientosEvolutivos
+      Jwt__Audience: BancoEcuador
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: mantenimientos_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in Dokploy}"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mantenimientos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  default:
+  dokploy-network:
+    external: true
